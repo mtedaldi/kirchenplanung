@@ -1,0 +1,74 @@
+# =============================================================================
+# Kirchenplanung — Docker Compose
+# Version: Platzhalter (Implementierung ausstehend)
+# =============================================================================
+#
+# Drei Container:
+#   nginx  — Reverse Proxy, TLS-Terminierung, statische Assets
+#   app    — FastAPI + uvicorn (Python)
+#   db     — PostgreSQL 16
+#
+# Starten:    docker compose up -d
+# Stoppen:    docker compose down
+# Logs:       docker compose logs -f app
+# Migration:  docker compose exec app alembic upgrade head
+
+services:
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - static_files:/app/static:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - APP_ENV=${APP_ENV}
+      - APP_BASE_URL=${APP_BASE_URL}
+      - DEBUG=${DEBUG}
+    volumes:
+      - static_files:/app/static
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # Kein öffentlicher Port — nur über nginx erreichbar
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./docs/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # Kein öffentlicher Port — nur intern erreichbar
+
+volumes:
+  db_data:
+    driver: local
+  static_files:
+    driver: local
+
+networks:
+  default:
+    name: kirchenplanung_network

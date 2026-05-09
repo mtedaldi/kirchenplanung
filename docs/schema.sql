@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Kirchliches Planungs- und Reservationssystem
--- Datenbankschema Version 1.2
+-- Datenbankschema Version 1.3
 -- Datenbank: PostgreSQL 15+
 -- Erstellt mit KI-Unterstützung (Claude, Anthropic)
 -- =============================================================================
@@ -75,11 +75,18 @@ CREATE TABLE app_user (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     person_id       UUID NOT NULL UNIQUE REFERENCES person(id),
     email           TEXT NOT NULL UNIQUE,  -- Login-Email (kann von person.email abweichen)
-    password_hash   TEXT NOT NULL,         -- bcrypt oder Argon2, nie Klartext
+    password_hash   TEXT,                  -- NULL wenn nur OAuth/Passkey (kein NOT NULL!)
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     last_login_at   TIMESTAMPTZ,
     deleted_at      TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Mindestens eine Auth-Methode muss vorhanden sein.
+    -- Erweiterbar: einfach weitere OR-Bedingungen anfügen für OAuth, Passkey etc.
+    CONSTRAINT at_least_one_auth_method CHECK (
+        password_hash IS NOT NULL
+        -- OR oauth_subject IS NOT NULL      (Phase 2: OAuth)
+        -- OR has_passkey IS NOT NULL        (Phase 2: Passkey, via passkey_credential-Tabelle)
+    )
 );
 
 COMMENT ON TABLE app_user IS
@@ -580,6 +587,51 @@ COMMENT ON COLUMN duty_schedule.note IS
 -- Index: typischste Query ist "wer hat diese Woche Dienst?"
 CREATE INDEX idx_duty_schedule_date
     ON duty_schedule (date, person_id);
+
+-- =============================================================================
+-- ZUKUNFTSSICHERHEIT — Explizite Designentscheide
+-- Dieser Abschnitt dokumentiert Stellen wo bewusste Entscheide getroffen wurden
+-- um spätere Erweiterungen nicht zu verbauen.
+-- =============================================================================
+
+-- [AUTH-1] password_hash ist nullable in app_user.
+--   Grund: OAuth (Google, Microsoft) und Passkey (WebAuthn) als zusätzliche
+--   Auth-Methoden sollen ohne Schema-Umbau ergänzbar sein.
+--   Phase 2 OAuth: ALTER TABLE app_user ADD COLUMN oauth_provider TEXT, oauth_subject TEXT;
+--                  + CHECK-Constraint in at_least_one_auth_method anpassen
+--   Phase 2 Passkey: neue Tabelle passkey_credential (siehe unten, auskommentiert)
+
+-- [AUTH-2] Passkey-Tabelle (vorbereitet, noch nicht aktiv)
+-- CREATE TABLE passkey_credential (
+--     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     user_id         UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+--     credential_id   BYTEA NOT NULL UNIQUE,   -- WebAuthn Credential ID
+--     public_key      BYTEA NOT NULL,           -- COSE-kodierter Public Key
+--     sign_count      BIGINT NOT NULL DEFAULT 0,
+--     aaguid          UUID,                     -- Authenticator-Typ
+--     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+--     last_used_at    TIMESTAMPTZ
+-- );
+
+-- [ROLE-1] Rollen sind DB-Datensätze, nicht hardcodiert im Code.
+--   Grund: Neue Rollen (z.B. 'viewer', 'coordinator') können ohne Code-Änderung
+--   hinzugefügt werden — nur Applikationslogik muss neue Rolle kennen.
+
+-- [EVENT-1] category in event ist TEXT (Freitext), kein ENUM und keine FK.
+--   Grund: Kategorien sind kirchgemeinde-spezifisch und ändern sich.
+--   Phase 2: Separate event_category-Tabelle wenn Filterung/Reporting wichtig wird.
+
+-- [LOCATION-1] location.type ist ein ENUM (location_type).
+--   Achtung: PostgreSQL-ENUMs sind schwer zu ändern (ALTER TYPE ... ADD VALUE ist ok,
+--   aber Werte entfernen erfordert Migration). Falls mehr Flexibilität nötig:
+--   Phase 2: Auf TEXT + CHECK-Constraint oder separate lookup-Tabelle umstellen.
+
+-- [OCCURRENCE-1] parent_id in event_occurrence ist vorbereitet für wiederkehrende Anlässe.
+--   Im MVP nicht verwendet. Keine Logik dafür im Backend nötig — das Feld schadet nicht.
+
+-- [DUTY-1] duty_schedule hat kein Konzept von "Bereitschaft vs. Anwesenheit".
+--   Bewusst offen gelassen. Das note-Feld trägt diese Nuance als Freitext.
+--   Phase 2: Boolean is_on_call oder duty_type ENUM falls nötig.
 
 -- =============================================================================
 -- ENDE SCHEMA
