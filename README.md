@@ -79,4 +79,4 @@ Dieses Projekt wurde mit Unterstützung von KI-Werkzeugen (Claude, Anthropic) en
 
 ## Lizenz
 
-Proprietär — alle Rechte vorbehalten. Nutzung ausschliesslich durch die betreibende Kirchgemeinde.
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
