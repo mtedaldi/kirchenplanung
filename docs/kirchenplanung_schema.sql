@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Kirchliches Planungs- und Reservationssystem
--- Datenbankschema Version 1.1
+-- Datenbankschema Version 1.2
 -- Datenbank: PostgreSQL 15+
 -- Erstellt mit KI-Unterstützung (Claude, Anthropic)
 -- =============================================================================
