@@ -1,82 +1,98 @@
-openapi: "3.1.0"
-
+openapi: 3.1.0
 info:
   title: Kirchliches Planungs- und Reservationssystem
-  version: "0.1.0"
-  description: |
-    API für das kirchliche Planungs- und Reservationssystem.
+  version: 0.2.0
+  description: 'API für das kirchliche Planungs- und Reservationssystem.
+
 
     ## Authentifizierung
+
     Alle Endpunkte ausser `/auth/login` und `/kalender/public` erfordern einen
+
     gültigen JWT im HttpOnly-Cookie (`access_token`).
 
+
     ## Rollen
+
     - **requester** — Kann Anlässe erstellen und eigene bearbeiten
+
     - **approver** — Kann Anlässe freigeben/ablehnen
+
     - **admin** — Vollzugriff, Benutzerverwaltung, Sperrzeiten
 
+
     ## Workflow
-    ```
-    requested → approved → confirmed
-    requested → rejected → requested (nach Überarbeitung)
-    any → cancelled (Endzustand)
+
     ```
 
+    requested → approved → confirmed
+
+    requested → rejected → requested (nach Überarbeitung)
+
+    any → cancelled (Endzustand)
+
+    ```
+
+
     ## Hinweise
+
     - Zeitstempel immer in UTC (ISO 8601: `2026-05-09T14:00:00Z`)
+
     - UUID v4 als Primärschlüssel
+
     - Self-Approval ist technisch unterbunden (HTTP 403)
+
+    '
   contact:
     name: Marco Tedaldi
     url: https://github.com/mtedaldi/kirchenplanung
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-
+  x-security-conventions:
+    rbac: Jeder Endpunkt mit x-required-roles MUSS via FastAPI Depends(require_role(...))
+      gesichert sein
+    ownership: Endpunkte mit x-ownership-check MUSS via Depends(require_owner_or_admin(...))
+      gesichert sein
+    rate_limiting:
+      /auth/login: 5 req/min pro IP (nginx)
+      /calendar/public: 60 req/min pro IP (nginx)
+      default: 300 req/min pro IP (nginx)
+    jwt: HttpOnly-Cookie, kein Authorization-Header
+    password_strength: zxcvbn Score >= 3 verpflichtend bei Erstellung und Änderung
 servers:
-  - url: https://kirchenplanung.example.ch/api/v1
-    description: Produktion (Infomaniak VPS)
-  - url: http://localhost:8000/api/v1
-    description: Lokale Entwicklung
-
-# =============================================================================
-# TAGS (Gruppierung)
-# =============================================================================
+- url: https://kirchenplanung.example.ch/api/v1
+  description: Produktion (Infomaniak VPS)
+- url: http://localhost:8000/api/v1
+  description: Lokale Entwicklung
 tags:
-  - name: auth
-    description: Authentifizierung und Session-Management
-  - name: events
-    description: Anlässe (zentrales Objekt)
-  - name: occurrences
-    description: Konkrete Termine eines Anlasses
-  - name: locations
-    description: Räume und Gebäude
-  - name: resources
-    description: Begrenzte Ressourcen (Mikrofone, Stühle etc.)
-  - name: persons
-    description: Personenstammdaten
-  - name: users
-    description: Benutzerverwaltung (Admin)
-  - name: duty
-    description: Dienstplan-Journal
-  - name: blackouts
-    description: Sperrzeiten (Admin)
-  - name: calendar
-    description: Kalenderansichten
-  - name: admin
-    description: Administrative Funktionen (Archivierung, DSG)
-
-# =============================================================================
-# PATHS
-# =============================================================================
+- name: auth
+  description: Authentifizierung und Session-Management
+- name: events
+  description: Anlässe (zentrales Objekt)
+- name: occurrences
+  description: Konkrete Termine eines Anlasses
+- name: locations
+  description: Räume und Gebäude
+- name: resources
+  description: Begrenzte Ressourcen (Mikrofone, Stühle etc.)
+- name: persons
+  description: Personenstammdaten
+- name: users
+  description: Benutzerverwaltung (Admin)
+- name: duty
+  description: Dienstplan-Journal
+- name: blackouts
+  description: Sperrzeiten (Admin)
+- name: calendar
+  description: Kalenderansichten
+- name: admin
+  description: Administrative Funktionen (Archivierung, DSG)
 paths:
-
-  # ---------------------------------------------------------------------------
-  # AUTH
-  # ---------------------------------------------------------------------------
   /auth/login:
     post:
-      tags: [auth]
+      tags:
+      - auth
       summary: Einloggen
       description: Gibt JWT als HttpOnly-Cookie zurück.
       requestBody:
@@ -86,7 +102,7 @@ paths:
             schema:
               $ref: '#/components/schemas/LoginRequest'
       responses:
-        "200":
+        '200':
           description: Login erfolgreich
           headers:
             Set-Cookie:
@@ -97,63 +113,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "429":
+        '429':
           $ref: '#/components/responses/TooManyRequests'
-
   /auth/logout:
     post:
-      tags: [auth]
+      tags:
+      - auth
       summary: Ausloggen
       description: Löscht JWT-Cookies serverseitig.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "204":
+        '204':
           description: Logout erfolgreich
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
   /auth/refresh:
     post:
-      tags: [auth]
+      tags:
+      - auth
       summary: Access-Token erneuern
       description: Verwendet Refresh-Token-Cookie um neuen Access-Token zu erhalten.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Token erneuert
           headers:
             Set-Cookie:
               schema:
                 type: string
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
   /auth/me:
     get:
-      tags: [auth]
+      tags:
+      - auth
       summary: Aktuell eingeloggter Benutzer
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Benutzerprofil
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserProfile'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
   /auth/me/password:
     put:
-      tags: [auth]
+      tags:
+      - auth
       summary: Eigenes Passwort ändern
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -161,66 +177,71 @@ paths:
             schema:
               $ref: '#/components/schemas/ChangePasswordRequest'
       responses:
-        "204":
+        '204':
           description: Passwort geändert
-        "400":
+        '400':
           $ref: '#/components/responses/BadRequest'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
-  # ---------------------------------------------------------------------------
-  # EVENTS (Anlässe)
-  # ---------------------------------------------------------------------------
   /events:
     get:
-      tags: [events]
+      tags:
+      - events
       summary: Anlässe auflisten
-      description: |
-        Gibt Anlässe zurück abhängig von der Rolle des aufrufenden Benutzers:
+      description: 'Gibt Anlässe zurück abhängig von der Rolle des aufrufenden Benutzers:
+
         - **requester**: nur eigene Anlässe
+
         - **approver/admin**: alle Anlässe
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
-        - name: status
-          in: query
-          schema:
-            $ref: '#/components/schemas/EventStatus'
-        - name: from
-          in: query
-          description: Startdatum (ISO 8601)
-          schema:
-            type: string
-            format: date
-        - name: to
-          in: query
-          description: Enddatum (ISO 8601)
-          schema:
-            type: string
-            format: date
-        - name: location_id
-          in: query
-          schema:
-            type: string
-            format: uuid
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/EventStatus'
+      - name: from
+        in: query
+        description: Startdatum (ISO 8601)
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        description: Enddatum (ISO 8601)
+        schema:
+          type: string
+          format: date
+      - name: location_id
+        in: query
+        schema:
+          type: string
+          format: uuid
       responses:
-        "200":
+        '200':
           description: Liste von Anlässen
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventListResponse'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
-      tags: [events]
+      tags:
+      - events
       summary: Neuen Anlass erstellen
-      description: Erstellt Anlass mit Status `requested`. Erfordert Rolle `requester` oder höher.
+      description: Erstellt Anlass mit Status `requested`. Erfordert Rolle `requester`
+        oder höher.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -228,47 +249,54 @@ paths:
             schema:
               $ref: '#/components/schemas/EventCreateRequest'
       responses:
-        "201":
+        '201':
           description: Anlass erstellt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventDetail'
-        "400":
+        '400':
           $ref: '#/components/responses/BadRequest'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "409":
+        '409':
           $ref: '#/components/responses/Conflict'
-
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /events/{event_id}:
     parameters:
-      - $ref: '#/components/parameters/EventId'
+    - $ref: '#/components/parameters/EventId'
     get:
-      tags: [events]
+      tags:
+      - events
       summary: Anlass abrufen
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventDetail'
           description: Anlassdetail
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
     patch:
-      tags: [events]
+      tags:
+      - events
       summary: Anlass bearbeiten
-      description: |
-        Nur durch Ersteller (status `requested` oder `rejected`) oder Admin.
+      description: 'Nur durch Ersteller (status `requested` oder `rejected`) oder
+        Admin.
+
         Genehmigte Anlässe können nicht mehr bearbeitet werden.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -276,88 +304,109 @@ paths:
             schema:
               $ref: '#/components/schemas/EventUpdateRequest'
       responses:
-        "200":
+        '200':
           description: Anlass aktualisiert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventDetail'
-        "400":
+        '400':
           $ref: '#/components/responses/BadRequest'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-        "409":
+        '409':
           $ref: '#/components/responses/Conflict'
-
+      x-required-roles:
+      - requester
+      - approver
+      - admin
+      x-ownership-check: event.created_by == current_user OR admin
     delete:
-      tags: [events]
+      tags:
+      - events
       summary: Anlass abbrechen (cancel)
-      description: |
-        Setzt Status auf `cancelled` (Soft Delete, kein physisches Löschen).
-        Nur Ersteller oder Admin.
-      security:
-        - cookieAuth: []
-      responses:
-        "204":
-          description: Anlass abgebrochen
-        "403":
-          $ref: '#/components/responses/Forbidden'
-        "404":
-          $ref: '#/components/responses/NotFound'
+      description: 'Setzt Status auf `cancelled` (Soft Delete, kein physisches Löschen).
 
+        Nur Ersteller oder Admin.
+
+        '
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Anlass abgebrochen
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
+      x-ownership-check: event.created_by == current_user OR admin
   /events/{event_id}/approve:
     post:
-      tags: [events]
+      tags:
+      - events
       summary: Anlass freigeben
-      description: |
-        Setzt Status auf `approved` → `confirmed`.
+      description: 'Setzt Status auf `approved` → `confirmed`.
+
         Erfordert Rolle `approver` oder `admin`.
+
         Self-Approval wird mit HTTP 403 abgelehnt.
+
         Bei aktiven Konflikten muss `conflict_reason` mitgeliefert werden.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ApproveRequest'
       responses:
-        "200":
+        '200':
           description: Anlass freigegeben
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventDetail'
-        "403":
+        '403':
           description: Keine Berechtigung oder Self-Approval-Versuch
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-        "409":
+        '409':
           description: Konflikt vorhanden aber kein conflict_reason geliefert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConflictDetail'
-
+      x-required-roles:
+      - approver
+      - admin
   /events/{event_id}/reject:
     post:
-      tags: [events]
+      tags:
+      - events
       summary: Anlass ablehnen
-      description: |
-        Setzt Status auf `rejected`. Erfordert Rolle `approver` oder `admin`.
+      description: 'Setzt Status auf `rejected`. Erfordert Rolle `approver` oder `admin`.
+
         `reason` ist verpflichtend.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
       requestBody:
         required: true
         content:
@@ -365,51 +414,63 @@ paths:
             schema:
               $ref: '#/components/schemas/RejectRequest'
       responses:
-        "200":
+        '200':
           description: Anlass abgelehnt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventDetail'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
+      x-required-roles:
+      - approver
+      - admin
   /events/{event_id}/resubmit:
     post:
-      tags: [events]
+      tags:
+      - events
       summary: Abgelehnten Anlass neu einreichen
-      description: |
-        Setzt Status von `rejected` zurück auf `requested`.
+      description: 'Setzt Status von `rejected` zurück auf `requested`.
+
         Nur durch den ursprünglichen Ersteller.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
       responses:
-        "200":
+        '200':
           description: Anlass neu eingereicht
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventDetail'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
+      x-required-roles:
+      - requester
+      x-ownership-check: event.created_by == current_user
   /events/{event_id}/audit:
     get:
-      tags: [events]
+      tags:
+      - events
       summary: Audit Log eines Anlasses
-      description: Erfordert Rolle `approver` oder `admin`.
+      description: 'Erfordert Rolle approver oder admin.
+
+        Approver: gefilterte Ausgabe — kein old_value/new_value für Personendaten.
+
+        Admin: vollständiger Audit-Trail.'
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/EventId'
       responses:
-        "200":
+        '200':
           description: Audit-Einträge
           content:
             application/json:
@@ -417,24 +478,25 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AuditEntry'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-  # ---------------------------------------------------------------------------
-  # OCCURRENCES (Termine)
-  # ---------------------------------------------------------------------------
+      x-required-roles:
+      - approver
+      - admin
+      x-audit-filter: approver receives redacted person fields
   /events/{event_id}/occurrences:
     parameters:
-      - $ref: '#/components/parameters/EventId'
+    - $ref: '#/components/parameters/EventId'
     get:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Termine eines Anlasses auflisten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Liste von Terminen
           content:
             application/json:
@@ -442,17 +504,20 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OccurrenceDetail'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
     post:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Neuen Termin hinzufügen
-      description: |
-        Führt Konfliktprüfung durch. Bei Konflikt wird `has_conflict = true`
+      description: 'Führt Konfliktprüfung durch. Bei Konflikt wird `has_conflict =
+        true`
+
         gesetzt, aber der Termin wird trotzdem erstellt (nicht blockiert).
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -460,26 +525,26 @@ paths:
             schema:
               $ref: '#/components/schemas/OccurrenceCreateRequest'
       responses:
-        "201":
+        '201':
           description: Termin erstellt (ggf. mit Konflikt-Flag)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OccurrenceDetail'
-        "400":
+        '400':
           $ref: '#/components/responses/BadRequest'
-        "409":
+        '409':
           $ref: '#/components/responses/Conflict'
-
   /events/{event_id}/occurrences/{occurrence_id}:
     parameters:
-      - $ref: '#/components/parameters/EventId'
-      - $ref: '#/components/parameters/OccurrenceId'
+    - $ref: '#/components/parameters/EventId'
+    - $ref: '#/components/parameters/OccurrenceId'
     patch:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Termin bearbeiten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -487,43 +552,43 @@ paths:
             schema:
               $ref: '#/components/schemas/OccurrenceUpdateRequest'
       responses:
-        "200":
+        '200':
           description: Termin aktualisiert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OccurrenceDetail'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
     delete:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Einzelnen Termin absagen
       description: Setzt `is_cancelled = true` auf dem Termin (nicht der gesamte Anlass).
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "204":
+        '204':
           description: Termin abgesagt
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
   /events/{event_id}/occurrences/{occurrence_id}/conflicts:
     get:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Konflikte eines Termins abrufen
       description: Gibt alle kollidierenden Termine zurück.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/EventId'
-        - $ref: '#/components/parameters/OccurrenceId'
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/OccurrenceId'
       responses:
-        "200":
+        '200':
           description: Konflikteliste
           content:
             application/json:
@@ -531,20 +596,20 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ConflictDetail'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
   /events/{event_id}/occurrences/{occurrence_id}/participants:
     parameters:
-      - $ref: '#/components/parameters/EventId'
-      - $ref: '#/components/parameters/OccurrenceId'
+    - $ref: '#/components/parameters/EventId'
+    - $ref: '#/components/parameters/OccurrenceId'
     get:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Teilnehmer eines Termins auflisten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Teilnehmerliste (Snapshots)
           content:
             application/json:
@@ -552,14 +617,14 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ParticipantSnapshot'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
     post:
-      tags: [occurrences]
+      tags:
+      - occurrences
       summary: Teilnehmer hinzufügen
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -567,36 +632,33 @@ paths:
             schema:
               $ref: '#/components/schemas/ParticipantAddRequest'
       responses:
-        "201":
+        '201':
           description: Teilnehmer hinzugefügt (Snapshot erstellt)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ParticipantSnapshot'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-  # ---------------------------------------------------------------------------
-  # LOCATIONS
-  # ---------------------------------------------------------------------------
   /locations:
     get:
-      tags: [locations]
+      tags:
+      - locations
       summary: Räume und Gebäude auflisten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: type
-          in: query
-          schema:
-            $ref: '#/components/schemas/LocationType'
-        - name: active_only
-          in: query
-          schema:
-            type: boolean
-            default: true
+      - name: type
+        in: query
+        schema:
+          $ref: '#/components/schemas/LocationType'
+      - name: active_only
+        in: query
+        schema:
+          type: boolean
+          default: true
       responses:
-        "200":
+        '200':
           description: Liste aller Locations
           content:
             application/json:
@@ -604,13 +666,13 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Location'
-
     post:
-      tags: [locations]
+      tags:
+      - locations
       summary: Neuen Raum/Gebäude erstellen
       description: Erfordert Rolle `admin`.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -618,43 +680,45 @@ paths:
             schema:
               $ref: '#/components/schemas/LocationCreateRequest'
       responses:
-        "201":
+        '201':
           description: Location erstellt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Location'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - admin
   /locations/{location_id}/availability:
     get:
-      tags: [locations]
+      tags:
+      - locations
       summary: Verfügbarkeit eines Raumes prüfen
       description: Gibt belegte Zeiträume im angegebenen Fenster zurück.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: location_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: from
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date-time
-        - name: to
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date-time
+      - name: location_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
       responses:
-        "200":
+        '200':
           description: Belegte Zeiträume
           content:
             application/json:
@@ -662,20 +726,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OccupiedSlot'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-  # ---------------------------------------------------------------------------
-  # RESOURCES
-  # ---------------------------------------------------------------------------
   /resources:
     get:
-      tags: [resources]
+      tags:
+      - resources
       summary: Ressourcen auflisten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Liste aller Ressourcen
           content:
             application/json:
@@ -683,13 +744,13 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Resource'
-
     post:
-      tags: [resources]
+      tags:
+      - resources
       summary: Neue Ressource erstellen
       description: Erfordert Rolle `admin`.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -697,48 +758,56 @@ paths:
             schema:
               $ref: '#/components/schemas/ResourceCreateRequest'
       responses:
-        "201":
+        '201':
           description: Ressource erstellt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Resource'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
-  # ---------------------------------------------------------------------------
-  # PERSONS
-  # ---------------------------------------------------------------------------
+      x-required-roles:
+      - admin
   /persons:
     get:
-      tags: [persons]
+      tags:
+      - persons
       summary: Personen auflisten
-      description: Erfordert Rolle `approver` oder `admin`.
+      description: 'Erfordert Rolle approver oder admin.
+
+        Approver: max. 10 Ergebnisse, nur via Suchbegriff (q verpflichtend).
+
+        Admin: vollständige Liste bis max. 50 Ergebnisse.
+
+        Pagination verpflichtend.'
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: q
-          in: query
-          description: Suchbegriff (Name, E-Mail)
-          schema:
-            type: string
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+      - name: q
+        in: query
+        description: Suchbegriff (Name, E-Mail)
+        schema:
+          type: string
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/LimitParam'
       responses:
-        "200":
+        '200':
           description: Personenliste
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PersonListResponse'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - approver
+      - admin
     post:
-      tags: [persons]
+      tags:
+      - persons
       summary: Neue Person erfassen
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -746,43 +815,46 @@ paths:
             schema:
               $ref: '#/components/schemas/PersonCreateRequest'
       responses:
-        "201":
+        '201':
           description: Person erfasst
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Person'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - approver
+      - admin
   /persons/{person_id}:
     parameters:
-      - name: person_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+    - name: person_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     get:
-      tags: [persons]
+      tags:
+      - persons
       summary: Person abrufen
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Personendetail
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Person'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
     patch:
-      tags: [persons]
+      tags:
+      - persons
       summary: Person bearbeiten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -790,52 +862,57 @@ paths:
             schema:
               $ref: '#/components/schemas/PersonUpdateRequest'
       responses:
-        "200":
+        '200':
           description: Person aktualisiert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Person'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
+      x-required-roles:
+      - approver
+      - admin
   /persons/{person_id}/anonymize:
     post:
-      tags: [persons]
+      tags:
+      - persons
       summary: Person anonymisieren (DSG Recht auf Vergessenwerden)
-      description: |
-        Erfordert Rolle `admin`.
-        Anonymisiert Stammdaten und alle Snapshots irreversibel.
-        Wird im Audit Log protokolliert.
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: person_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "204":
-          description: Person anonymisiert
-        "403":
-          $ref: '#/components/responses/Forbidden'
-        "404":
-          $ref: '#/components/responses/NotFound'
+      description: 'Erfordert Rolle `admin`.
 
-  # ---------------------------------------------------------------------------
-  # USERS (Benutzerverwaltung, Admin)
-  # ---------------------------------------------------------------------------
+        Anonymisiert Stammdaten und alle Snapshots irreversibel.
+
+        Wird im Audit Log protokolliert.
+
+        '
+      security:
+      - cookieAuth: []
+      parameters:
+      - name: person_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Person anonymisiert
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - admin
   /users:
     get:
-      tags: [users]
+      tags:
+      - users
       summary: Benutzer auflisten
       description: Erfordert Rolle `admin`.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Benutzerliste
           content:
             application/json:
@@ -843,15 +920,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/UserDetail'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - admin
     post:
-      tags: [users]
+      tags:
+      - users
       summary: Neuen Benutzer erstellen
       description: Erfordert Rolle `admin`. Verknüpft User mit bestehender Person.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -859,29 +938,31 @@ paths:
             schema:
               $ref: '#/components/schemas/UserCreateRequest'
       responses:
-        "201":
+        '201':
           description: Benutzer erstellt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserDetail'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - admin
   /users/{user_id}/roles:
     parameters:
-      - name: user_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     put:
-      tags: [users]
+      tags:
+      - users
       summary: Rollen eines Benutzers setzen
       description: Erfordert Rolle `admin`. Ersetzt alle bestehenden Rollen.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -889,66 +970,67 @@ paths:
             schema:
               $ref: '#/components/schemas/SetRolesRequest'
       responses:
-        "200":
+        '200':
           description: Rollen aktualisiert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserDetail'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
+      x-required-roles:
+      - admin
   /users/{user_id}/deactivate:
     post:
-      tags: [users]
+      tags:
+      - users
       summary: Benutzer deaktivieren
       description: Setzt `is_active = false`. Login nicht mehr möglich.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        "204":
+        '204':
           description: Benutzer deaktiviert
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-  # ---------------------------------------------------------------------------
-  # DUTY SCHEDULE (Dienstplan)
-  # ---------------------------------------------------------------------------
+      x-required-roles:
+      - admin
   /duty:
     get:
-      tags: [duty]
+      tags:
+      - duty
       summary: Dienstplan abrufen
       description: Erfordert Login. Nicht eingeloggte Benutzer sehen keine Dienstplandaten.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: from
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-          example: "2026-05-01"
-        - name: to
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-          example: "2026-05-31"
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        example: '2026-05-01'
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        example: '2026-05-31'
       responses:
-        "200":
+        '200':
           description: Dienstplan-Einträge im Zeitraum
           content:
             application/json:
@@ -956,14 +1038,14 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DutyEntry'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
     post:
-      tags: [duty]
+      tags:
+      - duty
       summary: Diensteintrag erstellen
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -971,30 +1053,34 @@ paths:
             schema:
               $ref: '#/components/schemas/DutyCreateRequest'
       responses:
-        "201":
+        '201':
           description: Diensteintrag erstellt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DutyEntry'
-        "400":
+        '400':
           $ref: '#/components/responses/BadRequest'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /duty/{duty_id}:
     parameters:
-      - name: duty_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+    - name: duty_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     patch:
-      tags: [duty]
+      tags:
+      - duty
       summary: Diensteintrag bearbeiten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -1002,52 +1088,59 @@ paths:
             schema:
               $ref: '#/components/schemas/DutyUpdateRequest'
       responses:
-        "200":
+        '200':
           description: Diensteintrag aktualisiert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DutyEntry'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
+      x-required-roles:
+      - requester
+      - approver
+      - admin
+      x-ownership-check: duty.person_id == current_user.person_id OR admin
     delete:
-      tags: [duty]
+      tags:
+      - duty
       summary: Diensteintrag löschen
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "204":
+        '204':
           description: Diensteintrag gelöscht
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-  # ---------------------------------------------------------------------------
-  # BLACKOUTS (Sperrzeiten)
-  # ---------------------------------------------------------------------------
+      x-required-roles:
+      - requester
+      - approver
+      - admin
+      x-ownership-check: duty.person_id == current_user.person_id OR admin
   /blackouts:
     get:
-      tags: [blackouts]
+      tags:
+      - blackouts
       summary: Sperrzeiten auflisten
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: from
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: to
-          in: query
-          schema:
-            type: string
-            format: date
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
       responses:
-        "200":
+        '200':
           description: Liste der Sperrzeiten
           content:
             application/json:
@@ -1055,13 +1148,13 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Blackout'
-
     post:
-      tags: [blackouts]
+      tags:
+      - blackouts
       summary: Sperrzeit erstellen
       description: Erfordert Rolle `admin`.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -1069,68 +1162,72 @@ paths:
             schema:
               $ref: '#/components/schemas/BlackoutCreateRequest'
       responses:
-        "201":
+        '201':
           description: Sperrzeit erstellt
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Blackout'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - admin
   /blackouts/{blackout_id}:
     parameters:
-      - name: blackout_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+    - name: blackout_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     delete:
-      tags: [blackouts]
+      tags:
+      - blackouts
       summary: Sperrzeit löschen
       description: Erfordert Rolle `admin`.
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "204":
+        '204':
           description: Sperrzeit gelöscht
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-  # ---------------------------------------------------------------------------
-  # CALENDAR
-  # ---------------------------------------------------------------------------
+      x-required-roles:
+      - admin
   /calendar/public:
     get:
-      tags: [calendar]
+      tags:
+      - calendar
       summary: Öffentlicher Kalender
-      description: |
-        Gibt bestätigte öffentliche Anlässe zurück.
+      description: 'Gibt bestätigte öffentliche Anlässe zurück.
+
         Kein Login erforderlich.
+
         Keine Personendaten enthalten.
+
+        '
       parameters:
-        - name: from
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-        - name: to
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-        - name: location_id
-          in: query
-          schema:
-            type: string
-            format: uuid
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: location_id
+        in: query
+        schema:
+          type: string
+          format: uuid
       responses:
-        "200":
+        '200':
           description: Öffentliche Kalendereinträge
           content:
             application/json:
@@ -1138,136 +1235,138 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CalendarEntryPublic'
-
   /calendar/internal:
     get:
-      tags: [calendar]
+      tags:
+      - calendar
       summary: Interner Kalender
-      description: |
-        Gibt alle sichtbaren Anlässe + Dienstplan zurück, abhängig von Rolle.
+      description: 'Gibt alle sichtbaren Anlässe + Dienstplan zurück, abhängig von
+        Rolle.
+
         Erfordert Login.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: from
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-        - name: to
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-        - name: location_id
-          in: query
-          schema:
-            type: string
-            format: uuid
-        - name: include_duty
-          in: query
-          schema:
-            type: boolean
-            default: true
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: location_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: include_duty
+        in: query
+        schema:
+          type: boolean
+          default: true
       responses:
-        "200":
+        '200':
           description: Interne Kalenderansicht
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CalendarInternal'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-
-  # ---------------------------------------------------------------------------
-  # ADMIN
-  # ---------------------------------------------------------------------------
   /admin/archive/run:
     post:
-      tags: [admin]
+      tags:
+      - admin
       summary: Archivierungsjob manuell auslösen
-      description: |
-        Erfordert Rolle `admin`.
+      description: 'Erfordert Rolle `admin`.
+
         Läuft normalerweise automatisch (Cron). Dieser Endpunkt erlaubt manuelle Auslösung.
+
         Der Job läuft asynchron — Status via `/admin/archive/status` abrufbar.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "202":
+        '202':
           description: Job gestartet
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobStatus'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "409":
+        '409':
           description: Job läuft bereits
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+      x-required-roles:
+      - admin
   /admin/archive/status:
     get:
-      tags: [admin]
+      tags:
+      - admin
       summary: Status des letzten Archivierungsjobs
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
-        "200":
+        '200':
           description: Job-Status
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobStatus'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-
+      x-required-roles:
+      - admin
   /admin/persons/{person_id}/export:
     get:
-      tags: [admin]
+      tags:
+      - admin
       summary: Datenauszug einer Person (DSG Auskunftsrecht)
-      description: |
-        Gibt alle gespeicherten Daten einer Person als JSON zurück.
+      description: 'Gibt alle gespeicherten Daten einer Person als JSON zurück.
+
         Erfordert Rolle `admin`.
+
+        '
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - name: person_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: person_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        "200":
+        '200':
           description: Vollständiger Datenauszug
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PersonDataExport'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
-
-# =============================================================================
-# COMPONENTS
-# =============================================================================
+      x-required-roles:
+      - admin
 components:
-
   securitySchemes:
     cookieAuth:
       type: apiKey
       in: cookie
       name: access_token
-
-  # ---------------------------------------------------------------------------
-  # PARAMETERS
-  # ---------------------------------------------------------------------------
   parameters:
     EventId:
       name: event_id
@@ -1295,12 +1394,8 @@ components:
       in: query
       schema:
         type: integer
-        default: 50
-        maximum: 200
-
-  # ---------------------------------------------------------------------------
-  # RESPONSES (wiederverwendbar)
-  # ---------------------------------------------------------------------------
+        default: 25
+        maximum: 50
   responses:
     Unauthorized:
       description: Nicht eingeloggt oder Token abgelaufen
@@ -1338,25 +1433,27 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-
-  # ---------------------------------------------------------------------------
-  # SCHEMAS
-  # ---------------------------------------------------------------------------
   schemas:
-
-    # --- Enums ---
     EventStatus:
       type: string
-      enum: [requested, approved, confirmed, rejected, cancelled]
-
+      enum:
+      - requested
+      - approved
+      - confirmed
+      - rejected
+      - cancelled
     LocationType:
       type: string
-      enum: [building, room, outdoor, other]
-
-    # --- Auth ---
+      enum:
+      - building
+      - room
+      - outdoor
+      - other
     LoginRequest:
       type: object
-      required: [email, password]
+      required:
+      - email
+      - password
       properties:
         email:
           type: string
@@ -1364,7 +1461,6 @@ components:
         password:
           type: string
           minLength: 8
-
     LoginResponse:
       type: object
       properties:
@@ -1377,7 +1473,6 @@ components:
           type: array
           items:
             type: string
-
     UserProfile:
       type: object
       properties:
@@ -1396,21 +1491,22 @@ components:
           type: string
           format: date-time
           nullable: true
-
     ChangePasswordRequest:
       type: object
-      required: [current_password, new_password]
+      required:
+      - current_password
+      - new_password
       properties:
         current_password:
           type: string
         new_password:
           type: string
           minLength: 10
-
-    # --- Events ---
     EventCreateRequest:
       type: object
-      required: [title, occurrences]
+      required:
+      - title
+      - occurrences
       properties:
         title:
           type: string
@@ -1429,7 +1525,6 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/OccurrenceCreateRequest'
-
     EventUpdateRequest:
       type: object
       properties:
@@ -1444,7 +1539,6 @@ components:
           nullable: true
         is_public:
           type: boolean
-
     EventDetail:
       type: object
       properties:
@@ -1485,7 +1579,6 @@ components:
         updated_at:
           type: string
           format: date-time
-
     EventListResponse:
       type: object
       properties:
@@ -1499,7 +1592,6 @@ components:
           type: integer
         limit:
           type: integer
-
     ApproveRequest:
       type: object
       properties:
@@ -1507,19 +1599,19 @@ components:
           type: string
           description: Verpflichtend wenn has_conflict = true
           nullable: true
-
     RejectRequest:
       type: object
-      required: [reason]
+      required:
+      - reason
       properties:
         reason:
           type: string
           minLength: 5
-
-    # --- Occurrences ---
     OccurrenceCreateRequest:
       type: object
-      required: [start_time, end_time]
+      required:
+      - start_time
+      - end_time
       properties:
         start_time:
           type: string
@@ -1539,7 +1631,6 @@ components:
         notes:
           type: string
           nullable: true
-
     OccurrenceUpdateRequest:
       type: object
       properties:
@@ -1557,7 +1648,6 @@ components:
         notes:
           type: string
           nullable: true
-
     OccurrenceDetail:
       type: object
       properties:
@@ -1590,7 +1680,6 @@ components:
         notes:
           type: string
           nullable: true
-
     ParticipantSnapshot:
       type: object
       properties:
@@ -1608,10 +1697,10 @@ components:
         phone_snapshot:
           type: string
           nullable: true
-
     ParticipantAddRequest:
       type: object
-      required: [person_id]
+      required:
+      - person_id
       properties:
         person_id:
           type: string
@@ -1619,8 +1708,6 @@ components:
         role:
           type: string
           nullable: true
-
-    # --- Locations ---
     Location:
       type: object
       properties:
@@ -1640,7 +1727,6 @@ components:
           nullable: true
         is_active:
           type: boolean
-
     LocationMinimal:
       type: object
       properties:
@@ -1649,10 +1735,11 @@ components:
           format: uuid
         name:
           type: string
-
     LocationCreateRequest:
       type: object
-      required: [name, type]
+      required:
+      - name
+      - type
       properties:
         name:
           type: string
@@ -1665,7 +1752,6 @@ components:
         capacity:
           type: integer
           nullable: true
-
     OccupiedSlot:
       type: object
       properties:
@@ -1682,8 +1768,6 @@ components:
           format: date-time
         status:
           $ref: '#/components/schemas/EventStatus'
-
-    # --- Resources ---
     Resource:
       type: object
       properties:
@@ -1696,20 +1780,22 @@ components:
           type: integer
         is_active:
           type: boolean
-
     ResourceCreateRequest:
       type: object
-      required: [name, total_quantity]
+      required:
+      - name
+      - total_quantity
       properties:
         name:
           type: string
         total_quantity:
           type: integer
           minimum: 1
-
     ResourceRequest:
       type: object
-      required: [resource_id, quantity]
+      required:
+      - resource_id
+      - quantity
       properties:
         resource_id:
           type: string
@@ -1717,8 +1803,6 @@ components:
         quantity:
           type: integer
           minimum: 1
-
-    # --- Persons ---
     Person:
       type: object
       properties:
@@ -1737,7 +1821,6 @@ components:
           type: string
           format: date-time
           nullable: true
-
     PersonMinimal:
       type: object
       properties:
@@ -1746,10 +1829,10 @@ components:
           format: uuid
         name:
           type: string
-
     PersonCreateRequest:
       type: object
-      required: [name]
+      required:
+      - name
       properties:
         name:
           type: string
@@ -1760,7 +1843,6 @@ components:
         phone:
           type: string
           nullable: true
-
     PersonUpdateRequest:
       type: object
       properties:
@@ -1773,7 +1855,6 @@ components:
         phone:
           type: string
           nullable: true
-
     PersonListResponse:
       type: object
       properties:
@@ -1783,10 +1864,11 @@ components:
             $ref: '#/components/schemas/Person'
         total:
           type: integer
-
     PersonDataExport:
       type: object
-      description: Vollständiger Datenauszug für DSG-Auskunftsrecht
+      description: 'Vollständiger Datenauszug für DSG-Auskunftsrecht. Audit-Einträge
+        gefiltert: nur entity_id == person_id; changed_by wird anonymisiert (nur UUID,
+        kein Name).'
       properties:
         person:
           $ref: '#/components/schemas/Person'
@@ -1802,8 +1884,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AuditEntry'
-
-    # --- Users ---
     UserDetail:
       type: object
       properties:
@@ -1827,10 +1907,12 @@ components:
         created_at:
           type: string
           format: date-time
-
     UserCreateRequest:
       type: object
-      required: [person_id, email, password]
+      required:
+      - person_id
+      - email
+      - password
       properties:
         person_id:
           type: string
@@ -1845,20 +1927,22 @@ components:
           type: array
           items:
             type: string
-          default: [requester]
-
+          default:
+          - requester
     SetRolesRequest:
       type: object
-      required: [roles]
+      required:
+      - roles
       properties:
         roles:
           type: array
           minItems: 1
           items:
             type: string
-            enum: [requester, approver, admin]
-
-    # --- Duty ---
+            enum:
+            - requester
+            - approver
+            - admin
     DutyEntry:
       type: object
       properties:
@@ -1883,10 +1967,11 @@ components:
         note:
           type: string
           nullable: true
-
     DutyCreateRequest:
       type: object
-      required: [date, person_id]
+      required:
+      - date
+      - person_id
       properties:
         date:
           type: string
@@ -1908,7 +1993,6 @@ components:
         note:
           type: string
           nullable: true
-
     DutyUpdateRequest:
       type: object
       properties:
@@ -1925,8 +2009,6 @@ components:
         note:
           type: string
           nullable: true
-
-    # --- Blackouts ---
     Blackout:
       type: object
       properties:
@@ -1948,10 +2030,11 @@ components:
             type: string
             format: uuid
           description: Leer = systemweit
-
     BlackoutCreateRequest:
       type: object
-      required: [start_time, end_time]
+      required:
+      - start_time
+      - end_time
       properties:
         start_time:
           type: string
@@ -1968,8 +2051,6 @@ components:
             type: string
             format: uuid
           description: Leer = systemweit
-
-    # --- Calendar ---
     CalendarEntryPublic:
       type: object
       properties:
@@ -1991,7 +2072,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LocationMinimal'
-
     CalendarInternal:
       type: object
       properties:
@@ -2007,8 +2087,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Blackout'
-
-    # --- Audit ---
     AuditEntry:
       type: object
       properties:
@@ -2031,7 +2109,11 @@ components:
           nullable: true
         action:
           type: string
-          enum: [INSERT, UPDATE, DELETE, ANONYMIZE]
+          enum:
+          - INSERT
+          - UPDATE
+          - DELETE
+          - ANONYMIZE
         changed_by:
           $ref: '#/components/schemas/PersonMinimal'
           nullable: true
@@ -2041,8 +2123,6 @@ components:
         changed_at:
           type: string
           format: date-time
-
-    # --- Admin ---
     JobStatus:
       type: object
       properties:
@@ -2051,7 +2131,10 @@ components:
           format: uuid
         status:
           type: string
-          enum: [running, completed, failed]
+          enum:
+          - running
+          - completed
+          - failed
         started_at:
           type: string
           format: date-time
@@ -2068,8 +2151,6 @@ components:
         error:
           type: string
           nullable: true
-
-    # --- Conflicts ---
     ConflictDetail:
       type: object
       properties:
@@ -2089,8 +2170,6 @@ components:
         end_time:
           type: string
           format: date-time
-
-    # --- Errors ---
     ErrorResponse:
       type: object
       properties:
@@ -2100,7 +2179,6 @@ components:
           type: string
         request_id:
           type: string
-
     ValidationErrorResponse:
       type: object
       properties:
