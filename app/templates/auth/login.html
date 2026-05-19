@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} — Kirchenplanung</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="auth-page">
+    <main class="auth-container">
+        <div class="auth-card">
+            <h1>Kirchliches Planungssystem</h1>
+            <h2>Anmelden</h2>
+
+            {% if error %}
+            <div class="alert alert-error" role="alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form
+                hx-post="/api/v1/auth/login"
+                hx-target="#form-messages"
+                hx-swap="innerHTML"
+                method="post"
+            >
+                <div class="form-group">
+                    <label for="email">E-Mail</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        autocomplete="email"
+                        required
+                        autofocus
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Passwort</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+
+                <div id="form-messages"></div>
+
+                <button type="submit" class="btn btn-primary">
+                    Anmelden
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"
+            integrity="sha384-..."
+            crossorigin="anonymous"></script>
+</body>
+</html>

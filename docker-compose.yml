@@ -1,22 +1,9 @@
-# =============================================================================
-# Kirchenplanung — Docker Compose
-# Version: Platzhalter (Implementierung ausstehend)
-# =============================================================================
-#
-# Drei Container:
-#   nginx  — Reverse Proxy, TLS-Terminierung, statische Assets
-#   app    — FastAPI + uvicorn (Python)
-#   db     — PostgreSQL 16
-#
-# Starten:    docker compose up -d
-# Stoppen:    docker compose down
-# Logs:       docker compose logs -f app
-# Migration:  docker compose exec app alembic upgrade head
-
 services:
 
   nginx:
     image: nginx:alpine
+    networks:
+      - frontend
     ports:
       - "80:80"
       - "443:443"
@@ -30,24 +17,37 @@ services:
 
   app:
     build:
-      context: ./app
+      context: .
       dockerfile: Dockerfile
+    networks:
+      - frontend   # nginx ↔ app
+      - backend    # app ↔ db
+    # Kein öffentlicher Port — nur über nginx erreichbar
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY}
       - APP_ENV=${APP_ENV}
       - APP_BASE_URL=${APP_BASE_URL}
       - DEBUG=${DEBUG}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES}
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=${JWT_REFRESH_TOKEN_EXPIRE_DAYS}
     volumes:
       - static_files:/app/static
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
-    # Kein öffentlicher Port — nur über nginx erreichbar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   db:
     image: postgres:16-alpine
+    networks:
+      - backend    # Nur internes Netzwerk — kein Internetzugang
+    # Kein öffentlicher Port
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -61,7 +61,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    # Kein öffentlicher Port — nur intern erreichbar
 
 volumes:
   db_data:
@@ -70,5 +69,7 @@ volumes:
     driver: local
 
 networks:
-  default:
-    name: kirchenplanung_network
+  frontend:
+    # nginx ↔ app: kein internal — nginx braucht Internet für Let's Encrypt
+  backend:
+    internal: true   # app ↔ db: kein Internet-Zugang für db-Container
