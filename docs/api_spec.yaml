@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Kirchliches Planungs- und Reservationssystem
-  version: 0.2.0
+  version: 0.2.1
   description: 'API für das kirchliche Planungs- und Reservationssystem.
 
 
@@ -60,6 +60,13 @@ info:
       default: 300 req/min pro IP (nginx)
     jwt: HttpOnly-Cookie, kein Authorization-Header
     password_strength: zxcvbn Score >= 3 verpflichtend bei Erstellung und Änderung
+    network:
+      nginx: Only container with public ports (80, 443)
+      app: No public ports — internal Docker network only
+      db: 'No public ports — internal: true Docker network, no internet access'
+      ufw: 'Host firewall: only ports 22, 80, 443 open'
+      fail2ban: Monitors nginx logs, bans IPs after repeated login failures
+      ssh: Password auth disabled, root login disabled, key-only
 servers:
 - url: https://kirchenplanung.example.ch/api/v1
   description: Produktion (Infomaniak VPS)
@@ -130,6 +137,7 @@ paths:
           description: Logout erfolgreich
         '401':
           $ref: '#/components/responses/Unauthorized'
+      x-note-auth: any authenticated user
   /auth/refresh:
     post:
       tags:
@@ -147,6 +155,7 @@ paths:
                 type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+      x-note-auth: any authenticated user
   /auth/me:
     get:
       tags:
@@ -163,6 +172,7 @@ paths:
                 $ref: '#/components/schemas/UserProfile'
         '401':
           $ref: '#/components/responses/Unauthorized'
+      x-note-auth: any authenticated user
   /auth/me/password:
     put:
       tags:
@@ -183,6 +193,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+      x-note-auth: any authenticated user
   /events:
     get:
       tags:
@@ -285,6 +296,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     patch:
       tags:
       - events
@@ -506,6 +521,10 @@ paths:
                   $ref: '#/components/schemas/OccurrenceDetail'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
       tags:
       - occurrences
@@ -535,6 +554,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /events/{event_id}/occurrences/{occurrence_id}:
     parameters:
     - $ref: '#/components/parameters/EventId'
@@ -562,6 +585,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     delete:
       tags:
       - occurrences
@@ -576,6 +603,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /events/{event_id}/occurrences/{occurrence_id}/conflicts:
     get:
       tags:
@@ -598,6 +629,10 @@ paths:
                   $ref: '#/components/schemas/ConflictDetail'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /events/{event_id}/occurrences/{occurrence_id}/participants:
     parameters:
     - $ref: '#/components/parameters/EventId'
@@ -619,6 +654,10 @@ paths:
                   $ref: '#/components/schemas/ParticipantSnapshot'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
       tags:
       - occurrences
@@ -640,6 +679,10 @@ paths:
                 $ref: '#/components/schemas/ParticipantSnapshot'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /locations:
     get:
       tags:
@@ -666,6 +709,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Location'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
       tags:
       - locations
@@ -728,6 +775,10 @@ paths:
                   $ref: '#/components/schemas/OccupiedSlot'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /resources:
     get:
       tags:
@@ -744,6 +795,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Resource'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
       tags:
       - resources
@@ -849,6 +904,9 @@ paths:
                 $ref: '#/components/schemas/Person'
         '404':
           $ref: '#/components/responses/NotFound'
+      x-required-roles:
+      - approver
+      - admin
     patch:
       tags:
       - persons
@@ -1040,6 +1098,10 @@ paths:
                   $ref: '#/components/schemas/DutyEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
       tags:
       - duty
@@ -1148,6 +1210,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Blackout'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
     post:
       tags:
       - blackouts
@@ -1280,6 +1346,10 @@ paths:
                 $ref: '#/components/schemas/CalendarInternal'
         '401':
           $ref: '#/components/responses/Unauthorized'
+      x-required-roles:
+      - requester
+      - approver
+      - admin
   /admin/archive/run:
     post:
       tags:
