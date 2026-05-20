@@ -7,13 +7,17 @@ WORKDIR /app
 
 # Abhängigkeiten zuerst (Docker-Cache nutzen)
 COPY pyproject.toml .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e .
 
-# App-Code
+# app-Verzeichnis muss für hatchling existieren
+RUN mkdir -p app && touch app/__init__.py
+
+RUN pip install --no-cache-dir --root-user-action=ignore --upgrade pip && \
+    pip install --no-cache-dir --root-user-action=ignore .
+
+# App-Code (überschreibt den leeren Platzhalter)
 COPY app/ app/
 
-# Statische Verzeichnisse
+# Verzeichnisse für statische Dateien und Templates
 RUN mkdir -p app/static app/templates
 
 # Ownership
