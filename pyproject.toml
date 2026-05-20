@@ -32,7 +32,7 @@ dependencies = [
     "zxcvbn>=4.4.28",
 
     # Validierung
-    "pydantic>=2.7.0",
+    "pydantic[email]>=2.7.0",
     "pydantic-settings>=2.3.0",
 
     # HTTP-Client (für interne Tests)
